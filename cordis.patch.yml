@@ -1,0 +1,5 @@
+- insert:
+    - id: dsh-memory-tide
+      name: 'dsh-memory-tide'
+      config:
+        enabled: true

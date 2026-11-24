@@ -1,5 +1,10 @@
 # dsh-memory-tide（记忆潮汐）
 
+[![npm](https://img.shields.io/npm/v/dsh-memory-tide?style=flat-square)](https://www.npmjs.com/package/dsh-memory-tide)
+[![tests](https://img.shields.io/github/actions/workflow/status/QIC-9821/dsh-memory-tide/ci.yml?style=flat-square&label=tests)](https://github.com/QIC-9821/dsh-memory-tide/actions)
+[![license](https://img.shields.io/github/license/QIC-9821/dsh-memory-tide?style=flat-square)](https://github.com/QIC-9821/dsh-memory-tide/blob/main/LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A522-5FA04E?style=flat-square)](https://nodejs.org)
+
 给 DSH 的记忆插件加一条**遗忘曲线**：长期没被提起的记忆会自动归档、转冷归档，或按你的选择直接删除。
 
 **常驻 token 增量 = 0**：不注册工具、不向 systemPrompt 注入任何内容，只作为后台清扫器和设置页存在。

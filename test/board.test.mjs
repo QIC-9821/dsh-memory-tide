@@ -111,6 +111,7 @@ function makeSettings(overrides = {}) {
     enabled: true,
     dryRun: false,
     mentions: { enabled: true, minSharedGrams: 2, protectKeywords: '勿删' },
+    curve: { model: 'exponential', baseTtlDays: 7, growth: 2, survivalFloor: 0.1, maxTtlEnabled: true, maxTtlDays: 90 },
     archive: { archiveDays: 30, onExpiry: 'cold' },
     board: { pageSize: 100 },
     ...overrides,
@@ -131,7 +132,8 @@ function setup() {
   const archiveCold = [makeEntry('fish', 'e', { text: '冷归档 E' })]
   const store = makeStore({ hot: archiveHot, cold: archiveCold })
   const state = makeState({
-    'fish:c': { state: 'active', pinned: true, touches: 4 },
+    'fish:c': { state: 'active', pinned: true, touches: 4, firstSeenAt: NOW - 2 * DAY },
+    'evolve:m1': { state: 'active', pinned: false, touches: 0, firstSeenAt: NOW - 1 * DAY },
     'fish:d': { state: 'archived', archivedAt: NOW - DAY, expiresAt: NOW + 10 * DAY },
     'fish:e': { state: 'cold', archivedAt: NOW - 40 * DAY },
   })
@@ -160,6 +162,12 @@ test('listEntries merges live and archive, sorts date desc with null last', asyn
   assert.equal(byKey.get('fish:d').state, 'archived')
   assert.equal(byKey.get('fish:d').adapterLabel, 'fish-label')
   assert.equal(byKey.get('fish:d').expiresAt, NOW + 10 * DAY)
+
+  // 活跃条目的倒计时必须按当前曲线现算（而不是沿用 state 里恒为 0 的 expiresAt）
+  assert.equal(byKey.get('fish:c').expiresAt, null) // pinned：永不自动过期
+  const expected = NOW - 1 * DAY + 7 * Math.log2(10) * DAY
+  assert.ok(Math.abs(byKey.get('evolve:m1').expiresAt - expected) < 1)
+  assert.equal(byKey.get('fish:a').expiresAt, null) // 没有 firstSeenAt 的条目不给假倒计时
   assert.equal(byKey.get('fish:e').state, 'cold')
   assert.equal(byKey.get('fish:b').date, null)
   assert.equal(byKey.get('fish:b').dateText, '')

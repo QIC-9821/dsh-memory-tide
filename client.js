@@ -53,6 +53,7 @@
         'badge.pinned': '置顶',
         'track.memory': '长期记忆',
         'track.key': '关键事实',
+        'track.all': '全部轨道',
         'track.user': '用户档案',
         'track.project': '项目记忆',
         'track.daily': '日常日志',
@@ -100,8 +101,12 @@
         'set.dryRun': '演练模式（只统计，不删）',
         'set.dryRunHint': '打开后清扫只写日志和统计，不动任何文件。',
         'set.curve': '遗忘曲线',
-        'set.curveHint': 'TTL = 基础天数 × 增长倍数^n，n 是显性提及次数。',
-        'set.base': '基础 TTL（天）',
+        'set.curveHint': '指数衰减：强度按半衰期指数下降，每被提到一次强度×增长倍数，低于存活阈值才算忘。常数叠加：TTL = 基础 × 增长^n。',
+        'set.curveModel': '曲线模型',
+        'set.curveExp': '指数衰减（艾宾浩斯）',
+        'set.curveAdd': '常数叠加',
+        'set.survivalFloor': '存活阈值（仅指数）',
+        'set.base': '基础 TTL / 半衰期（天）',
         'set.growth': '增长倍数',
         'set.maxTtl': '启用 TTL 上限',
         'set.maxDays': '上限（天）',
@@ -347,7 +352,12 @@
 .mt-empty span{opacity:.62;font-size:12.5px}
 .mt-error{margin:16px 0;padding:12px 14px;border-radius:10px;border:1px solid rgba(224,91,91,.45);background:rgba(224,91,91,.08);font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .mt-hint-block{padding:16px;text-align:center;opacity:.65;font-size:12.5px}
-.mt-bulk{position:sticky;bottom:8px;margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-radius:12px;border:1px solid var(--dsh-border,rgba(127,127,127,.3));background:var(--dsh-surface,rgba(32,32,32,.92));box-shadow:0 6px 22px rgba(0,0,0,.22);backdrop-filter:blur(8px);font-size:12.5px}
+.mt-bulk{position:sticky;bottom:8px;margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-radius:12px;border:1px solid rgba(0,0,0,.14);background:#fff;color:#1f2328;box-shadow:0 6px 22px rgba(0,0,0,.22);backdrop-filter:blur(8px);font-size:12.5px}
+.mt-bulk .mt-btn{border-color:rgba(0,0,0,.22);background:#f6f7f9;color:#1f2328}
+.mt-bulk .mt-btn:hover{background:#eef0f3}
+.mt-bulk .mt-btn.primary{background:var(--dsh-accent,#4f8cff);border-color:var(--dsh-accent,#4f8cff);color:#fff}
+.mt-bulk .mt-btn.danger{color:#c0392b;border-color:rgba(192,57,43,.35)}
+.mt-bulk .mt-btn.danger:hover{background:rgba(192,57,43,.08)}
 .mt-bulk .mt-spacer{flex:1}
 .mt-set-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
 .mt-set-head .mt-spacer{flex:1}
@@ -500,7 +510,7 @@
       /* ------------------------------------------------------------------ 状态 */
       const ui = {
         tab: 'memories',
-        filter: { state: 'all', adapter: '', q: '' },
+        filter: { state: 'all', adapter: '', track: '', q: '' },
         rows: [],
         total: 0,
         page: 1,
@@ -611,6 +621,17 @@
           } })
           els.adapter = adapter
 
+          const track = h('select', { class: 'mt-select', onchange: function (event) {
+            ui.filter.track = event.target.value
+            refreshEntries(true)
+          } })
+          els.track = track
+          append(track, h('option', { value: '', text: t('track.all') }))
+          for (const id of ['memory', 'key', 'user', 'project', 'daily']) {
+            append(track, h('option', { value: id, text: t('track.' + id) }))
+          }
+          track.value = ui.filter.track || ''
+
           const chips = h('div', { class: 'mt-chips' })
           els.chips = chips
           const statsEl = h('span', { class: 'mt-stats' })
@@ -641,6 +662,7 @@
           const toolbar = h('div', { class: 'mt-toolbar' }, [
             search,
             adapter,
+            track,
             button(t('btn.refresh'), function () { refreshEntries(true) }),
             button(t('btn.scan'), function () { runScan() }, { primary: true }),
           ])
@@ -1024,6 +1046,15 @@
             curveWarn.hidden = value
           })
           const curveCard = card(t('set.curve'), t('set.curveHint'), h('div', {}, [
+            h('div', { class: 'mt-field' }, [
+              h('span', { class: 'mt-label', text: t('set.curveModel') }),
+              radioGroup('mt-curve-model', curve.model || 'exponential', [
+                { value: 'exponential', label: t('set.curveExp') },
+                { value: 'additive', label: t('set.curveAdd') },
+              ], function (value) {
+                setDraftPath('curve.model', value)
+              }),
+            ]),
             h('div', { class: 'mt-row' }, [
               numberField(t('set.base'), curve.baseTtlDays, function (value) {
                 setDraftPath('curve.baseTtlDays', value)
@@ -1031,6 +1062,9 @@
               numberField(t('set.growth'), curve.growth, function (value) {
                 setDraftPath('curve.growth', value)
               }, { step: '0.1', min: '1' }),
+              numberField(t('set.survivalFloor'), curve.survivalFloor, function (value) {
+                setDraftPath('curve.survivalFloor', value)
+              }, { step: '0.01', min: '0.001', max: '0.9' }),
               maxDaysInput,
             ]),
             h('div', { style: { marginTop: '10px' } }, maxToggle),
@@ -1491,6 +1525,7 @@
           const params = new URLSearchParams()
           params.set('state', ui.filter.state)
           if (ui.filter.adapter) params.set('adapter', ui.filter.adapter)
+          if (ui.filter.track) params.set('track', ui.filter.track)
           if (ui.filter.q) params.set('q', ui.filter.q)
           params.set('page', String(ui.page))
           params.set('pageSize', String(ui.pageSize))

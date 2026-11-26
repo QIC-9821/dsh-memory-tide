@@ -262,14 +262,14 @@ test('GET /api/entries forwards filters and paging to the board', async () => {
   assert.deepEqual(res.json.data, { total: 2, page: 2, pageSize: 50, rows: [] })
   const args = calls.listEntries[0]
   assert.equal(args.settings.enabled, true)
-  assert.deepEqual(args.query, { state: 'archived', adapter: 'fish', q: 'alpha', page: 2, pageSize: 50 })
+  assert.deepEqual(args.query, { state: 'archived', adapter: 'fish', track: '', q: 'alpha', page: 2, pageSize: 50 })
 })
 
 test('GET /api/entries applies defaults and clamps pageSize', async () => {
   const { deps, calls } = makeDeps()
   const handler = mount(deps)
   await call(handler, 'GET', '/memory-tide/api/entries')
-  assert.deepEqual(calls.listEntries[0].query, { state: 'all', adapter: '', q: '', page: 1, pageSize: 100 })
+  assert.deepEqual(calls.listEntries[0].query, { state: 'all', adapter: '', track: '', q: '', page: 1, pageSize: 100 })
 
   await call(handler, 'GET', '/memory-tide/api/entries?pageSize=9999&page=0')
   assert.equal(calls.listEntries[1].query.pageSize, 500)

@@ -150,7 +150,7 @@ export async function readLog(lines = 50) -> string[]
 
 `curve.mjs`
 ```js
-export function ttlDays(touches, curve)      // base * growth^touches；maxTtlEnabled 时 min(..., maxTtlDays)
+export function ttlDays(touches, curve)      // model='exponential'（默认）: base*(t*log2(growth)+log2(1/floor))；model='additive': base*growth^t；maxTtlEnabled 时 min(..., maxTtlDays)
 export function lastActivity(item)           // max(resetAt, lastRecalledAt, firstSeenAt)
 export function isExpired(item, curve, now)  // now >= lastActivity + ttlDays*86400000
 export function nextExpiry(item, curve)      // 毫秒时间戳，展示用

@@ -184,6 +184,11 @@ test('listEntries filters by state, adapter and q, and paginates', async () => {
   const byTag = await listEntries({ registry, state, settings, store, query: { q: '习惯' } })
   assert.deepEqual(byTag.rows.map((row) => row.key), ['fish:c'])
 
+  const keyTrack = await listEntries({ registry, state, settings, store, query: { track: 'key' } })
+  assert.deepEqual(keyTrack.rows, [])
+  const memoryTrack = await listEntries({ registry, state, settings, store, query: { track: 'memory' } })
+  assert.deepEqual(memoryTrack.rows.map((row) => row.key), ['evolve:m1'])
+
   const page1 = await listEntries({ registry, state, settings, store, query: { page: 1, pageSize: 2 } })
   assert.deepEqual(page1.rows.map((row) => row.key), ['fish:c', 'evolve:m1'])
   const page2 = await listEntries({ registry, state, settings, store, query: { page: 2, pageSize: 2 } })

@@ -15,7 +15,7 @@
 |---|---|
 | `lib/settings.mjs` | 默认值、白名单清洗、原子写、`DSH_MEMORY_TIDE_HOME` 隔离 |
 | `lib/store.mjs` | state.json、hot/cold 归档、改动前备份 |
-| `lib/curve.mjs` | `ttl = base × growth^touches`，上限可关 |
+| `lib/curve.mjs` | 两种曲线：指数衰减（默认，`S = 2^(-t/base)`，提及 ×growth，低于 survivalFloor 到期，`ttl = base × (touches·log2(growth) + log2(1/floor))`）与常数叠加（`ttl = base × growth^touches`）；上限可关 |
 | `lib/match.mjs` | 提到检测：字符 n-gram、共享 gram 阈值、保护词 |
 | `lib/sweep.mjs` | 一轮清扫：重复整合（可选）→ 到期判断、归档、冷却、删除、失败回滚 |
 | `lib/merge.mjs` | 近似重复聚类（Dice 2-gram）、保留/改写方案、写盘与回退 |
@@ -56,4 +56,4 @@
 node --test test/*.test.mjs
 ```
 
-90 个用例，覆盖曲线、匹配、清扫、四个适配器、发现、面板与路由。适配器测试都在 `mkdtemp` 里造数据，不碰真实记忆；`DSH_FISH_STORE_SAMPLE` 指向真实 fish 库时会额外跑一条只读冒烟。
+105 个用例，覆盖曲线、匹配、清扫、四个适配器、发现、面板与路由。适配器测试都在 `mkdtemp` 里造数据，不碰真实记忆；`DSH_FISH_STORE_SAMPLE` 指向真实 fish 库时会额外跑一条只读冒烟。

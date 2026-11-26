@@ -400,3 +400,85 @@ test('act returns per-key results for mixed batches and unknown ops', async () =
   assert.equal(unknown.results[0].ok, false)
   assert.match(unknown.results[0].error, /unknown op/)
 })
+
+test('listEntries surfaces source archives and act restores them', async () => {
+  const sourceEntry = {
+    key: 'evolve-archive:MEMORY.md#1234abcd',
+    adapterId: 'evolve',
+    entryId: 'MEMORY.md#1234abcd',
+    date: Date.UTC(2026, 10, 20),
+    dateText: '2026-11-20',
+    text: '源归档的一条',
+    raw: '[2026-11-20] 源归档的一条',
+    tags: ['源归档'],
+    archived: true,
+    file: 'C:\\mem\\MEMORY.md',
+    archiveFile: 'C:\\mem\\MEMORY-archive.md',
+    path: 'C:\\mem\\MEMORY-archive.md',
+  }
+  const restored = []
+  const evolve = {
+    id: 'evolve',
+    label: 'memory-evolve',
+    async list() {
+      return []
+    },
+    async listArchived() {
+      return [sourceEntry]
+    },
+    async unarchive(entry) {
+      restored.push(entry.key)
+      return { ok: true }
+    },
+    async add() {
+      return { ok: true }
+    },
+    async remove() {
+      return { removed: [], failed: [] }
+    },
+  }
+  const store = makeStore()
+  const state = makeState()
+  const board = await listEntries({
+    registry: makeRegistry([evolve]),
+    state,
+    settings: makeSettings(),
+    store,
+  })
+  assert.equal(board.total, 1)
+  assert.equal(board.rows[0].source, 'source-archive')
+  assert.equal(board.rows[0].state, 'archived')
+
+  const archivedOnly = await listEntries({
+    registry: makeRegistry([evolve]),
+    state,
+    settings: makeSettings(),
+    query: { state: 'archived' },
+    store,
+  })
+  assert.equal(archivedOnly.total, 1)
+
+  const restore = await act({
+    registry: makeRegistry([evolve]),
+    state,
+    settings: makeSettings(),
+    op: 'restore',
+    keys: [sourceEntry.key],
+    store,
+    now: NOW,
+  })
+  assert.equal(restore.results[0].ok, true)
+  assert.deepEqual(restored, [sourceEntry.key])
+
+  const deleted = await act({
+    registry: makeRegistry([evolve]),
+    state,
+    settings: makeSettings(),
+    op: 'delete',
+    keys: [sourceEntry.key],
+    store,
+    now: NOW,
+  })
+  assert.equal(deleted.results[0].ok, false)
+  assert.match(deleted.results[0].error, /restored/)
+})

@@ -384,3 +384,45 @@ test('evolve: the memory lock waits, times out and takes over a stale lock', asy
   await assert.rejects(stat(lockPath))
   assert.equal(isCanonical(await readFile(join(dir, 'MEMORY.md'), 'utf8')), true)
 })
+
+test('evolve: source archives are listed and restored into the live file', async (t) => {
+  const dir = await tempDir(t)
+  await seed(dir)
+  const adapter = createEvolveAdapter({
+    dir,
+    settings: defaultSettings(allTracks()),
+    backupFile: async () => {},
+  })
+
+  const archived = await adapter.listArchived()
+  assert.equal(archived.length, 3)
+  const memory = archived.find((entry) => entry.track === 'memory')
+  assert.ok(memory)
+  assert.equal(memory.key, `evolve-archive:${memory.entryId}`)
+  assert.equal(memory.archived, true)
+  assert.deepEqual(memory.tags, ['源归档'])
+  assert.equal(memory.archiveFile, join(dir, 'MEMORY-archive.md'))
+  assert.equal(memory.file, join(dir, 'MEMORY.md'))
+  assert.equal(memory.dateText, '2020-01-01')
+
+  const result = await adapter.unarchive(memory)
+  assert.deepEqual(result, { ok: true })
+  const live = await readFile(join(dir, 'MEMORY.md'), 'utf8')
+  assert.ok(live.includes('[2020-01-01] 归档记忆'))
+  assert.equal(isCanonical(live), true)
+  const archive = await readFile(join(dir, 'MEMORY-archive.md'), 'utf8')
+  assert.equal(archive.trim(), '')
+  assert.equal((await adapter.listArchived()).length, 2)
+  assert.ok((await adapter.list()).some((entry) => entry.text === '归档记忆'))
+
+  // A disabled track is invisible to the sweep but its archive stays visible;
+  // restoring it is an explicit manual action and is allowed.
+  const narrow = createEvolveAdapter({
+    dir,
+    settings: defaultSettings(),
+    backupFile: async () => {},
+  })
+  const narrowArchived = await narrow.listArchived()
+  assert.ok(narrowArchived.some((entry) => entry.track === 'user'))
+  assert.ok(!(await narrow.list()).some((entry) => entry.track === 'user'))
+})

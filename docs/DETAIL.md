@@ -33,13 +33,16 @@
   async list(): Entry[],
   async remove(entries): { removed: string[], failed: [{key, error}] },
   async add(entry): { ok: boolean, error?: string },
+  // 可选：源插件自己的归档
+  async listArchived?(): Entry[],
+  async unarchive?(entry): { ok: boolean, error?: string },
 }
 ```
 
 `Entry` 必备字段：`key`、`adapterId`、`entryId`、`text`、`date`、`raw`；可选 `file`、`track`、`tags`、`dateText`。
 
 - **fish**：读 `~/.dsh/fish-memory/*.json`，写前比对 mtime；不写 `deleted[]` 墓碑；恢复时复用原 `entryId`。
-- **evolve**：按真实布局 `MEMORY.md` / `USER.md` / `projects/<hash>/KEY.md` / `projects/<hash>/MEMORY.md` / `daily/YYYY-MM-DD.md`；写前用它的 `.memory.lock`，drift guard 失败就拒绝覆盖；忽略 `*-archive.md`、`*.bak*`、`TODOS.md`。
+- **evolve**：按真实布局 `MEMORY.md` / `USER.md` / `projects/<hash>/KEY.md` / `projects/<hash>/MEMORY.md` / `daily/YYYY-MM-DD.md`；写前用它的 `.memory.lock`，drift guard 失败就拒绝覆盖；自动清扫忽略 `*-archive.md`、`*.bak*`、`TODOS.md`；`listArchived` 单独读 `*-archive.md`（同文去重、含已关闭轨），`unarchive` 把条目搬回活文件。
 - **file-md / file-json**：设置页配置路径、分隔符、日期正则、列表路径；只整段删，保留其余字节和换行风格。
 
 ## 安全不变量
@@ -56,4 +59,4 @@
 node --test test/*.test.mjs
 ```
 
-105 个用例，覆盖曲线、匹配、清扫、四个适配器、发现、面板与路由。适配器测试都在 `mkdtemp` 里造数据，不碰真实记忆；`DSH_FISH_STORE_SAMPLE` 指向真实 fish 库时会额外跑一条只读冒烟。
+107 个用例，覆盖曲线、匹配、清扫、四个适配器（含源归档列出与恢复）、发现、面板与路由。适配器测试都在 `mkdtemp` 里造数据，不碰真实记忆；`DSH_FISH_STORE_SAMPLE` 指向真实 fish 库时会额外跑一条只读冒烟。

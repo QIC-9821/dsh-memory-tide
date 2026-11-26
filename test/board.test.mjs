@@ -201,6 +201,10 @@ test('listEntries filters by state, adapter and q, and paginates', async () => {
   const memoryTrack = await listEntries({ registry, state, settings, store, query: { track: 'memory' } })
   assert.deepEqual(memoryTrack.rows.map((row) => row.key), ['evolve:m1'])
 
+  // 「已置顶」筛的是置顶标记，不是 state 字段（置顶条目本身仍是 active）
+  const pinnedOnly = await listEntries({ registry, state, settings, store, query: { state: 'pinned' } })
+  assert.deepEqual(pinnedOnly.rows.map((row) => row.key), ['fish:c'])
+
   const page1 = await listEntries({ registry, state, settings, store, query: { page: 1, pageSize: 2 } })
   assert.deepEqual(page1.rows.map((row) => row.key), ['fish:c', 'evolve:m1'])
   const page2 = await listEntries({ registry, state, settings, store, query: { page: 2, pageSize: 2 } })

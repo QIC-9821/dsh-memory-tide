@@ -193,12 +193,36 @@ test('GET /api/state reports settings, stats and adapters', async () => {
   const data = res.json.data
   assert.deepEqual(data.stats, { active: 2, archived: 1, cold: 1 })
   assert.deepEqual(data.adapters, [
-    { id: 'fish', label: 'Fish Memory', path: 'C:\\libs\\fish.json', count: 2, enabled: true },
+    { id: 'fish', label: 'Fish Memory', path: 'C:\\libs\\fish.json', count: 2, missing: false, enabled: true },
   ])
   assert.equal(data.lastSweepAt, 1234)
   assert.equal(data.firstSweepDone, true)
   assert.deepEqual(data.firstRunReport, { dryRun: true, adapters: [] })
   assert.equal(data.settings.enabled, true)
+})
+
+test('GET /api/state marks an adapter whose store directory is gone', async () => {
+  const { deps } = makeDeps()
+  deps.registry = {
+    adapters: () => [
+      {
+        id: 'fish',
+        label: 'Fish Memory',
+        async describe() {
+          return { path: 'C:\\gone', count: 0, missing: true }
+        },
+        async list() {
+          return []
+        },
+      },
+    ],
+    get: () => undefined,
+  }
+  const handler = mount(deps)
+  const res = await call(handler, 'GET', '/memory-tide/api/state')
+
+  assert.equal(res.status, 200)
+  assert.equal(res.json.data.adapters[0].missing, true)
 })
 
 test('POST /api/settings saves a patch and reports warnings', async () => {

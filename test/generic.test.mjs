@@ -162,7 +162,7 @@ test('file-md: missing file lists nothing; unknown target fails without writing'
   const dir = await makeDir(t);
   const adapter = createFileMdAdapter(mdConfig(dir, 'nope.md', { delimiter: '\n§\n' }));
   assert.deepEqual(await adapter.list(), []);
-  assert.deepEqual(await adapter.describe(), { path: path.join(dir, 'nope.md'), count: 0 });
+  assert.deepEqual(await adapter.describe(), { path: path.join(dir, 'nope.md'), count: 0, missing: true });
 
   const file = path.join(dir, 'existing.md');
   const original = '一\n§\n二\n';
@@ -314,10 +314,10 @@ test('file-json: add creates a missing store and appends to a string array', asy
 test('file-json: describe counts entries and missing file yields zero', async (t) => {
   const dir = await makeDir(t);
   const missing = createFileJsonAdapter(jsonConfig(dir, 'missing.json', { listPath: '' }));
-  assert.deepEqual(await missing.describe(), { path: path.join(dir, 'missing.json'), count: 0 });
+  assert.deepEqual(await missing.describe(), { path: path.join(dir, 'missing.json'), count: 0, missing: true });
 
   const file = path.join(dir, 'two.json');
   await fs.writeFile(file, '[{"text":"a"},{"text":"b"}]', 'utf8');
   const adapter = createFileJsonAdapter(jsonConfig(dir, 'two.json', { listPath: '' }));
-  assert.deepEqual(await adapter.describe(), { path: file, count: 2 });
+  assert.deepEqual(await adapter.describe(), { path: file, count: 2, missing: false });
 });

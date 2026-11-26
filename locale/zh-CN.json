@@ -99,6 +99,7 @@
   "set.lastSweep": "上次清扫",
   "set.never": "从未",
   "set.sources": "记忆来源",
+  "set.sourcesEmpty": "未检测到可用的记忆来源。安装记忆插件后刷新即可看到。",
   "set.mode": "清理方式",
   "set.modeArchive": "归档（可恢复）",
   "set.modeDelete": "直接删除",

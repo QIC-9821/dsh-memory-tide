@@ -99,6 +99,7 @@
   "set.lastSweep": "Last sweep",
   "set.never": "Never",
   "set.sources": "Memory sources",
+  "set.sourcesEmpty": "No memory source detected. Install a memory plugin and refresh.",
   "set.mode": "Cleanup mode",
   "set.modeArchive": "Archive (recoverable)",
   "set.modeDelete": "Delete permanently",

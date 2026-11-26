@@ -121,6 +121,7 @@
         'set.lastSweep': '上次清扫',
         'set.never': '从未',
         'set.sources': '记忆来源',
+        'set.sourcesEmpty': '未检测到可用的记忆来源。安装记忆插件后刷新即可看到。',
         'set.mode': '清理方式',
         'set.modeArchive': '归档（可恢复）',
         'set.modeDelete': '直接删除',
@@ -671,7 +672,7 @@
           let matched = false
           for (const adapter of adapters) {
             const id = adapter && adapter.id
-            if (!id) continue
+            if (!id || adapter.missing === true) continue
             if (id === current) matched = true
             append(els.adapter, h('option', { value: id, text: adapter.label || id }))
           }
@@ -1185,7 +1186,11 @@
             ]),
           ])
 
-          const sourcesCard = card(t('set.sources'), null, h('div', {}, [fishCard, evolveCard]))
+          const sourceCards = []
+          if (!(fishInfo && fishInfo.missing)) sourceCards.push(fishCard)
+          if (!(evolveInfo && evolveInfo.missing)) sourceCards.push(evolveCard)
+          if (!sourceCards.length) append(sourceCards, h('div', { class: 'mt-hint', text: t('set.sourcesEmpty') }))
+          const sourcesCard = card(t('set.sources'), null, h('div', {}, sourceCards))
 
           /* 自定义适配器 */
           const customList = h('div', { class: 'mt-rows' })

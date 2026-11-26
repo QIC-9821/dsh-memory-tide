@@ -14,6 +14,7 @@ import { loadSettings, saveSettings, settingsPath } from './lib/settings.mjs'
 import * as store from './lib/store.mjs'
 import { matchMention } from './lib/match.mjs'
 import { sweep as sweepModule } from './lib/sweep.mjs'
+import { applyMerges } from './lib/merge.mjs'
 import { createRegistry } from './lib/adapters/registry.mjs'
 import { scan as scanModule } from './lib/discovery.mjs'
 import { createLogger } from './lib/log.mjs'
@@ -306,6 +307,12 @@ export async function apply(ctx, config = {}) {
     board,
     scan: scanModule,
     sweep: (options) => runSweep(options),
+    merge: async (options = {}) => {
+      const dryRun = options?.dryRun !== false
+      const report = await applyMerges({ registry, state, settings, logger, dryRun })
+      if (!dryRun) await flushState()
+      return report
+    },
     logger,
     paths: { dir: stateDir() },
     getSettings,

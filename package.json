@@ -1,8 +1,8 @@
 {
   "name": "dsh-memory-tide",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Automatic forgetting curve for DSH memory plugins: TTL with spaced reset, hot/cold archive, discovery for new stores, and a memory board.",
+  "description": "Automatic forgetting curve for DSH memory plugins: TTL with spaced reset, hot/cold archive, duplicate merging, discovery for new stores, and a memory board.",
   "license": "MIT",
   "author": "QIC-9821",
   "repository": {
@@ -39,7 +39,14 @@
   "scripts": {
     "test": "node --test test/*.test.mjs"
   },
-  "keywords": ["dsh", "dsh-plugin", "memory", "forgetting-curve", "archive"],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "memory",
+    "forgetting-curve",
+    "archive",
+    "merge"
+  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -47,7 +54,9 @@
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-settings"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
     }
   }
 }

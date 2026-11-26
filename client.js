@@ -157,6 +157,23 @@
         'set.confidence': '置信度',
         'set.log': '最近日志',
         'set.logEmpty': '还没有日志。',
+        'set.merge': '重复记忆整合',
+        'set.mergeHint': '同一来源、同一文件、同一轨里，把近似重复的记忆合成一条；纯本地比较，不调用模型。',
+        'set.mergeEnabled': '启用重复整合',
+        'set.mergeMode': '整合方式',
+        'set.mergeKeepLatest': '保留最新（不合成文本）',
+        'set.mergeReconcile': '按最新日期改写（保留前置条件）',
+        'set.mergeThreshold': '相似度阈值',
+        'set.mergeMinChars': '最短参与字数',
+        'set.mergeDates': '保留日期数',
+        'set.mergeCost': '预览免费：整合是本地计算，0 token。',
+        'set.mergePreviewCount': '共 {n} 组，将删除 {removed} 条重复',
+        'set.mergeDrop': '删除 {n} 条',
+        'btn.mergePreview': '预览整合',
+        'btn.mergeApply': '立即整合',
+        'toast.merged': '已整合 {n} 组，删除 {removed} 条',
+        'confirm.merge': '确定整合这 {n} 组重复记忆？会改写原文件并删除重复条（写前有备份，但不进归档）。',
+        'confirm.mergeAll': '还没有预览结果，确定直接扫描并整合所有重复记忆？',
       }
 
       let DICT = ZH
@@ -359,6 +376,8 @@
 .mt-found-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--dsh-border,rgba(127,127,127,.22));border-radius:9px;font-size:12.5px}
 .mt-found-row .mt-path{flex:1;min-width:160px}
 .mt-log{max-height:260px;overflow:auto;margin:0;padding:10px 12px;border-radius:9px;border:1px solid var(--dsh-border,rgba(127,127,127,.22));background:rgba(127,127,127,.06);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
+.mt-merge-row{display:grid;gap:4px;padding:8px 10px;border-radius:9px;border:1px solid var(--dsh-border,rgba(127,127,127,.18));background:rgba(127,127,127,.04)}
+.mt-merge-text{font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
 .mt-toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;align-items:center;z-index:9999;pointer-events:none}
 .mt-toast{pointer-events:auto;max-width:min(520px,86vw);padding:9px 15px;border-radius:999px;font-size:13px;border:1px solid var(--dsh-border,rgba(127,127,127,.3));background:var(--dsh-surface,#262626);box-shadow:0 8px 26px rgba(0,0,0,.28);animation:mt-in .16s ease-out}
 .mt-toast.error{border-color:rgba(224,91,91,.6)}
@@ -496,6 +515,7 @@
         scan: null,
         log: null,
         logLoading: false,
+        mergePreview: null,
         savings: 0,
         alive: true,
       }
@@ -1034,6 +1054,62 @@
             ]),
           ]))
 
+          /* 重复整合 */
+          const merge = draft.merge || {}
+          const mergePreview = ui.mergePreview
+          const mergeResult = h('div', { class: 'mt-rows', style: { marginTop: '8px', fontSize: '12.5px' } })
+          if (mergePreview) {
+            const groups = Array.isArray(mergePreview.groups) ? mergePreview.groups : []
+            let dropTotal = 0
+            for (const group of groups) dropTotal += (group.dropKeys || []).length
+            append(mergeResult, h('div', { class: 'mt-hint' }, [
+              t('set.mergePreviewCount', { n: groups.length, removed: dropTotal }),
+            ]))
+            groups.slice(0, 20).forEach(function (group) {
+              append(mergeResult, h('div', { class: 'mt-merge-row' }, [
+                h('div', {}, [
+                  h('span', { class: 'mt-badge', text: group.adapterId + (group.track ? ' · ' + group.track : '') }),
+                  h('span', { class: 'mt-hint', text: '  ' + t('set.mergeDrop', { n: (group.dropKeys || []).length }) }),
+                ]),
+                h('div', { class: 'mt-merge-text', text: group.mergedText || '' }),
+              ]))
+            })
+            if (mergePreview.warnings && mergePreview.warnings.length) {
+              append(mergeResult, h('div', { class: 'mt-warn', text: mergePreview.warnings[0] }))
+            }
+          }
+          const mergeCard = card(t('set.merge'), t('set.mergeHint'), h('div', {}, [
+            checkRow(t('set.mergeEnabled'), merge.enabled === true, function (value) {
+              setDraftPath('merge.enabled', value)
+            }),
+            h('div', { class: 'mt-field', style: { marginTop: '10px' } }, [
+              h('span', { class: 'mt-label', text: t('set.mergeMode') }),
+              radioGroup('mt-merge-mode', merge.mode || 'keep-latest', [
+                { value: 'keep-latest', label: t('set.mergeKeepLatest') },
+                { value: 'reconcile', label: t('set.mergeReconcile') },
+              ], function (value) {
+                setDraftPath('merge.mode', value)
+              }),
+            ]),
+            h('div', { class: 'mt-row', style: { marginTop: '10px' } }, [
+              numberField(t('set.mergeThreshold'), merge.threshold, function (value) {
+                setDraftPath('merge.threshold', value)
+              }, { step: '0.05', min: '0.5', max: '1' }),
+              numberField(t('set.mergeMinChars'), merge.minChars, function (value) {
+                setDraftPath('merge.minChars', value)
+              }, { step: '1', min: '4' }),
+              numberField(t('set.mergeDates'), merge.dateTrailCount, function (value) {
+                setDraftPath('merge.dateTrailCount', value)
+              }, { step: '1', min: '0' }),
+            ]),
+            h('div', { style: { display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap', alignItems: 'center' } }, [
+              button(t('btn.mergePreview'), function () { runMergePreview() }, { small: true }),
+              button(t('btn.mergeApply'), function () { applyMerge() }, { small: true }),
+              h('span', { class: 'mt-hint', text: t('set.mergeCost') }),
+            ]),
+            mergeResult,
+          ]))
+
           /* 清扫 */
           const sweepCard = card(t('set.sweep'), null, h('div', {}, [
             h('div', { class: 'mt-row' }, [
@@ -1266,7 +1342,7 @@
             h('pre', { class: 'mt-log', text: logLines.length ? logLines.join('\n') : t('set.logEmpty') }),
           ]))
 
-          replace(settingsPane, [head, switches, curveCard, archiveCard, sweepCard, statusCard, sourcesCard, customCard, discoveryCard, logCard])
+          replace(settingsPane, [head, switches, curveCard, archiveCard, mergeCard, sweepCard, statusCard, sourcesCard, customCard, discoveryCard, logCard])
           settingsPane.hidden = ui.tab !== 'settings'
         }
 
@@ -1319,11 +1395,38 @@
             })
         }
 
+        function runMergePreview() {
+          postJSON('/merge', { dryRun: true })
+            .then(function (data) {
+              ui.mergePreview = (data && data.report) || null
+              renderSettings()
+            })
+            .catch(function (error) {
+              toast('error', t('toast.actionFailed') + '：' + error.message)
+            })
+        }
+
+        function applyMerge() {
+          const preview = ui.mergePreview
+          const groups = preview && Array.isArray(preview.groups) ? preview.groups.length : 0
+          if (!window.confirm(groups ? t('confirm.merge', { n: groups }) : t('confirm.mergeAll'))) return
+          postJSON('/merge', { dryRun: false })
+            .then(function (data) {
+              const report = (data && data.report) || {}
+              ui.mergePreview = report
+              toast('ok', t('toast.merged', { n: report.applied || 0, removed: report.removedEntries || 0 }))
+              return pullState()
+            })
+            .catch(function (error) {
+              toast('error', t('toast.actionFailed') + '：' + error.message)
+            })
+        }
+
         function buildPatch() {
           const draft = ui.draft || {}
           const patch = {}
           for (const key of ['enabled', 'dryRun']) if (draft[key] !== undefined) patch[key] = draft[key]
-          for (const key of ['curve', 'archive', 'sweep', 'mentions', 'adapters', 'discovery', 'board']) {
+          for (const key of ['curve', 'archive', 'sweep', 'mentions', 'adapters', 'discovery', 'board', 'merge']) {
             if (draft[key] && typeof draft[key] === 'object') patch[key] = clone(draft[key])
           }
           if (Array.isArray(draft.customAdapters)) patch.customAdapters = clone(draft.customAdapters)

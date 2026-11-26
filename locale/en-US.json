@@ -134,5 +134,22 @@
   "set.skipped": "Skipped {n} file(s)",
   "set.confidence": "Confidence",
   "set.log": "Recent log",
-  "set.logEmpty": "No log entries yet."
+  "set.logEmpty": "No log entries yet.",
+  "set.merge": "Duplicate merging",
+  "set.mergeHint": "Merge near-duplicate memories inside one source, file and track. Local comparison only, no model call.",
+  "set.mergeEnabled": "Enable duplicate merging",
+  "set.mergeMode": "Merge mode",
+  "set.mergeKeepLatest": "Keep newest (no rewrite)",
+  "set.mergeReconcile": "Rewrite by newest date (keep preconditions)",
+  "set.mergeThreshold": "Similarity threshold",
+  "set.mergeMinChars": "Min chars",
+  "set.mergeDates": "Dates to keep",
+  "set.mergeCost": "Preview is free: merging is local, 0 tokens.",
+  "set.mergePreviewCount": "{n} group(s), {removed} duplicate(s) to remove",
+  "set.mergeDrop": "remove {n}",
+  "btn.mergePreview": "Preview merge",
+  "btn.mergeApply": "Merge now",
+  "toast.merged": "Merged {n} group(s), removed {removed} entries",
+  "confirm.merge": "Merge these {n} group(s)? Source files are rewritten and duplicates removed (backups are kept, but not archived).",
+  "confirm.mergeAll": "No preview yet. Scan and merge all duplicates now?"
 }

@@ -17,10 +17,12 @@
 | `lib/store.mjs` | state.json、hot/cold 归档、改动前备份 |
 | `lib/curve.mjs` | `ttl = base × growth^touches`，上限可关 |
 | `lib/match.mjs` | 提到检测：字符 n-gram、共享 gram 阈值、保护词 |
-| `lib/sweep.mjs` | 一轮清扫：到期判断、归档、冷却、删除、失败回滚 |
+| `lib/sweep.mjs` | 一轮清扫：重复整合（可选）→ 到期判断、归档、冷却、删除、失败回滚 |
+| `lib/merge.mjs` | 近似重复聚类（Dice 2-gram）、保留/改写方案、写盘与回退 |
+| `lib/reconcile.mjs` | 按最新日期改写：时间槽替换、前置条件补充、合并日期标记 |
 | `lib/board.mjs` | 记忆列表、单条/批量操作、分页过滤 |
-| `lib/routes.mjs` | 8 个 HTTP 端点，统一 `{ok:false,error}` |
-| `lib/adapters/*.mjs` | fish / evolve / file-md / file-json，统一 `list/remove/add` |
+| `lib/routes.mjs` | 9 个 HTTP 端点（含 `POST /merge`），统一 `{ok:false,error}` |
+| `lib/adapters/*.mjs` | fish / evolve / file-md / file-json，统一 `list/remove/add/update` |
 | `lib/discovery.mjs` | 扫 `~/.dsh` 找新记忆库，只读预览 |
 
 ## 适配器契约

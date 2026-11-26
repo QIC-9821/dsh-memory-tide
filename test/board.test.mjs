@@ -167,7 +167,11 @@ test('listEntries merges live and archive, sorts date desc with null last', asyn
   assert.equal(byKey.get('fish:c').expiresAt, null) // pinned：永不自动过期
   const expected = NOW - 1 * DAY + 7 * Math.log2(10) * DAY
   assert.ok(Math.abs(byKey.get('evolve:m1').expiresAt - expected) < 1)
-  assert.equal(byKey.get('fish:a').expiresAt, null) // 没有 firstSeenAt 的条目不给假倒计时
+  // 还没被清扫登记的新条目：用条目日期当起点，也要能给出倒计时
+  const entryDateA = Date.UTC(2026, 10, 1, 0, 0, 0) // setup 里 now(-4)
+  const expectedA = entryDateA + 7 * Math.log2(10) * DAY
+  assert.ok(Math.abs(byKey.get('fish:a').expiresAt - expectedA) < 1)
+  assert.equal(byKey.get('fish:b').expiresAt, null) // 既没 state 也没日期 → 不编造倒计时
   assert.equal(byKey.get('fish:e').state, 'cold')
   assert.equal(byKey.get('fish:b').date, null)
   assert.equal(byKey.get('fish:b').dateText, '')

@@ -133,7 +133,7 @@ export async function apply(ctx, config = {}) {
 
   let registry
   try {
-    registry = createRegistry({ settings, logger })
+    registry = createRegistry({ settings, getSettings: () => settings, logger })
   } catch (error) {
     logger.error(`createRegistry failed: ${error?.stack || error?.message || error}`)
     return

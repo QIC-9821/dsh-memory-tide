@@ -41,10 +41,10 @@
         'btn.ignore': '忽略',
         'filter.all': '全部',
         'filter.active': '活跃',
-        'filter.archived': '已归档',
+        'filter.archived': '热归档',
         'filter.cold': '冷归档',
         'filter.pinned': '已置顶',
-        'stats.line': '活跃 {active} · 已归档 {archived} · 冷归档 {cold}',
+        'stats.line': '活跃 {active} · 热归档 {archived} · 冷归档 {cold}',
         'group.today': '今天',
         'group.yesterday': '昨天',
         'group.week': '本周',
@@ -64,9 +64,16 @@
         'ttl.archiveLeft': '{n} 天后转冷',
         'ttl.archiveLeftDelete': '{n} 天后删除',
         'ttl.archiveExpired': '已到归档期限',
+        'tomb.decay': '到期被收走：{idle} 天没被提到 · 寿命 {ttl} 天 · 提过 {n} 次',
+        'tomb.decayUnknown': '到期被收走 · 没记下活跃时间',
+        'tomb.manual': '手动归档 · {date}',
+        'tomb.manualUnknown': '手动归档 · 没记下活跃时间',
+        'tomb.legacy': '早期归档 · 没记下原因',
+        'tomb.source': '记忆库自己收走的 · 潮汐没记原因',
+        'tomb.preview': '讲的是：{text}',
         'op.pin': '置顶',
         'op.unpin': '取消置顶',
-        'op.archive': '归档',
+        'op.archive': '热归档',
         'op.restore': '恢复',
         'op.delete': '删除',
         'list.loading': '加载中…',
@@ -77,7 +84,7 @@
         'bulk.selected': '已选 {n} 条',
         'confirm.deleteOne': '确定删除这条记忆吗？\n{label}\n删除前会备份到 ~/.dsh/memory-tide/backup/。',
         'confirm.deleteBulk': '确定删除 {n} 条记忆吗？\n来源：{sources}\n删除前会备份到 ~/.dsh/memory-tide/backup/。',
-        'toast.op.archive': '已归档 {n} 条',
+        'toast.op.archive': '已热归档 {n} 条',
         'toast.op.delete': '已删除 {n} 条',
         'toast.op.restore': '已恢复 {n} 条',
         'toast.op.pin': '已置顶 {n} 条',
@@ -101,10 +108,22 @@
         'set.dryRun': '演练模式（只统计，不删）',
         'set.dryRunHint': '打开后清扫只写日志和统计，不动任何文件。',
         'set.curve': '遗忘曲线',
-        'set.curveHint': '指数衰减：强度按半衰期指数下降，每被提到一次强度×增长倍数，低于存活阈值才算忘。常数叠加：TTL = 基础 × 增长^n。',
+        'set.curveHint': '艾宾浩斯：强度按半衰期指数下降，每被提到一次强度×增长倍数，低于存活阈值才算忘。常数叠加：TTL = 基础 × 增长^n。自定义函数：用表达式自己算天数。',
         'set.curveModel': '曲线模型',
-        'set.curveExp': '指数衰减（艾宾浩斯）',
+        'set.curveExp': '艾宾浩斯遗忘曲线（指数衰减）',
         'set.curveAdd': '常数叠加',
+        'set.curveCustom': '自定义函数',
+        'set.curveExpr': '函数表达式',
+        'set.curveExprHint': '可用变量：touches（被提及次数）、base（基础 TTL/半衰期，天）、growth（增长倍数）、floor（存活阈值）；也能直接用 log/ln/exp/sqrt/pow/abs/min/max/log10/log2/ceil/round 和常量 e/PI。返回天数，例如 base + log(touches + 1) * growth（注意 log(1)=0，纯 log 型在 0 次被提及时会立刻到期）。',
+        'set.curveExprBad': '这个表达式算不出有效天数，保存时会被回退成艾宾浩斯曲线',
+        'set.curvePreview': '预览（被提及 0 / 1 / 3 / 10 次时的天数）：',
+        'set.standalone': '独立记忆文件',
+        'set.standaloneHint': '不装其他记忆插件时，把记忆写进这个文件，潮汐也会按曲线清扫它。',
+        'set.standaloneEnabled': '启用独立记忆文件',
+        'set.standalonePath': '文件路径',
+        'set.standalonePathHint': '留空 = 默认地址（DSH 记忆目录下 memory-tide/MEMORY.md）',
+        'set.standaloneDelimiter': '条目分隔符',
+        'set.standaloneDelimiterHint': 'blank = 空行分段；也可以填 \\n§\\n',
         'set.survivalFloor': '存活阈值（仅指数）',
         'set.base': '基础 TTL / 半衰期（天）',
         'set.growth': '增长倍数',
@@ -334,6 +353,8 @@
 .mt-count.muted{opacity:.55}
 .mt-text{margin:7px 0 6px;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;opacity:.92}
 .mt-text.open{display:block;-webkit-line-clamp:unset;overflow:visible}
+.mt-tomb{margin:6px 0 0;font-size:11.5px;line-height:1.5;opacity:.62;word-break:break-word}
+.mt-tomb b{font-weight:600;opacity:.9}
 .mt-card-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mt-tags{display:flex;gap:5px;flex-wrap:wrap;flex:1}
 .mt-tag{font-size:11.5px;opacity:.7;padding:0 6px;border-radius:5px;background:rgba(127,127,127,.12)}
@@ -720,6 +741,32 @@
           return h('span', { class: 'mt-count ' + tone, text: t('ttl.days', { n: daysLeft(left) }) })
         }
 
+        // 墓碑：归档条目头上留一行「为什么被收走、讲的是什么」，纯本地算好。
+        function tombNode(row) {
+          const tomb = row.tombstone
+          if (!tomb || (row.source !== 'archive' && row.source !== 'source-archive')) return null
+          let head
+          if (tomb.cause === 'decay') {
+            if (tomb.idleDays === null || tomb.idleDays === undefined) {
+              head = t('tomb.decayUnknown')
+            } else {
+              head = t('tomb.decay', {
+                idle: tomb.idleDays,
+                ttl: tomb.ttlDays === null || tomb.ttlDays === undefined ? '—' : tomb.ttlDays,
+                n: tomb.touches === null || tomb.touches === undefined ? 0 : tomb.touches,
+              })
+            }
+          } else if (tomb.cause === 'manual') {
+            head = tomb.at ? t('tomb.manual', { date: formatDate(tomb.at) }) : t('tomb.manualUnknown')
+          } else if (tomb.cause === 'source') {
+            head = t('tomb.source')
+          } else {
+            head = t('tomb.legacy')
+          }
+          const line = tomb.preview ? head + ' · ' + t('tomb.preview', { text: tomb.preview }) : head
+          return h('div', { class: 'mt-tomb', text: line })
+        }
+
         function cardFor(row) {
           const key = row.key
           const check = h('input', {
@@ -773,6 +820,7 @@
               countdownNode(row),
             ]),
             textNode,
+            tombNode(row),
             h('div', { class: 'mt-card-foot' }, [tags, h('div', { class: 'mt-actions' }, actions)]),
           ])
         }
@@ -895,6 +943,15 @@
         }
 
         /* -------------------------------------------------------------- 设置页 */
+        function isDraftDirty() {
+          if (!ui.draft || !ui.settings) return false
+          try {
+            return JSON.stringify(ui.draft) !== JSON.stringify(ui.settings)
+          } catch (error) {
+            return false
+          }
+        }
+
         function draftPath(path) {
           const parts = String(path).split('.')
           let node = ui.draft
@@ -915,7 +972,7 @@
             node = node[parts[i]]
           }
           node[parts[parts.length - 1]] = value
-          if (els.dirty) els.dirty.hidden = false
+          if (els.dirty) els.dirty.hidden = !isDraftDirty()
         }
 
         function card(title, hint, body) {
@@ -1008,7 +1065,7 @@
 
           const saved = h('span', { class: 'mt-saved' + (Date.now() - savedAt < 5000 ? ' on' : ''), text: t('set.saved') })
           els.saved = saved
-          const dirty = h('span', { class: 'mt-dirty', text: t('set.dirty'), hidden: Object.keys(draft).length === 0 })
+          const dirty = h('span', { class: 'mt-dirty', text: t('set.dirty'), hidden: !isDraftDirty() })
           els.dirty = dirty
 
           const head = h('div', { class: 'mt-set-head' }, [
@@ -1035,6 +1092,66 @@
           ]))
 
           /* 曲线 */
+          function readCurveNumbers() {
+            const c = ui.draft && ui.draft.curve ? ui.draft.curve : {}
+            const num = function (v, def) { return typeof v === 'number' && isFinite(v) ? v : def }
+            return {
+              base: num(c.baseTtlDays, 7),
+              growth: Math.max(1, num(c.growth, 2)),
+              floor: Math.min(0.9, Math.max(0.001, num(c.survivalFloor, 0.1))),
+              max: c.maxTtlEnabled === false ? Infinity : Math.max(1, num(c.maxTtlDays, 90)),
+            }
+          }
+          function curveDays(model, touches) {
+            const n = readCurveNumbers()
+            let days
+            if (model === 'additive') {
+              days = n.base * Math.pow(n.growth, touches)
+            } else if (model === 'custom') {
+              try {
+                const expr = (ui.draft && ui.draft.curve && ui.draft.curve.customExpr) || ''
+                // eslint-disable-next-line no-new-func
+                const fn = new Function('touches', 'base', 'growth', 'floor', 'return (' + expr + ');')
+                days = fn(touches, n.base, n.growth, n.floor)
+              } catch (error) {
+                return null
+              }
+            } else {
+              days = n.base * (Math.log2(1 / n.floor) + touches * Math.log2(n.growth))
+            }
+            if (typeof days !== 'number' || !isFinite(days) || days < 0) return null
+            return Math.min(days, n.max)
+          }
+          const curvePreview = h('div', { class: 'mt-hint' })
+          const curveExprBad = h('div', { class: 'mt-warn', text: t('set.curveExprBad') })
+          function renderCurvePreview() {
+            const model = (ui.draft && ui.draft.curve && ui.draft.curve.model) || 'exponential'
+            const parts = [0, 1, 3, 10].map(function (touches) {
+              const days = curveDays(model, touches)
+              return days == null ? '—' : String(Math.round(days * 10) / 10)
+            })
+            curvePreview.textContent = t('set.curvePreview') + ' ' + parts.join(' / ') + ' 天'
+            curveExprBad.hidden = !(model === 'custom' && parts[0] === '—')
+          }
+          const curveExprInput = h('input', {
+            class: 'mt-input',
+            type: 'text',
+            value: curve.customExpr == null ? '' : String(curve.customExpr),
+            oninput: function (event) {
+              setDraftPath('curve.customExpr', event.target.value)
+              renderCurvePreview()
+            },
+          })
+          const curveCustomBox = h('div', { style: { marginTop: '10px', display: 'grid', gap: '6px' } }, [
+            field(t('set.curveExpr'), curveExprInput, t('set.curveExprHint')),
+            curveExprBad,
+            curvePreview,
+          ])
+          function updateCurveVisibility() {
+            const model = (ui.draft && ui.draft.curve && ui.draft.curve.model) || 'exponential'
+            curveCustomBox.hidden = model !== 'custom'
+            renderCurvePreview()
+          }
           const maxDaysInput = numberField(t('set.maxDays'), curve.maxTtlDays, function (value) {
             setDraftPath('curve.maxTtlDays', value)
           }, { step: '1', min: '1', disabled: curve.maxTtlEnabled === false })
@@ -1044,6 +1161,7 @@
             const input = maxDaysInput.querySelector('input')
             if (input) input.disabled = !value
             curveWarn.hidden = value
+            renderCurvePreview()
           })
           const curveCard = card(t('set.curve'), t('set.curveHint'), h('div', {}, [
             h('div', { class: 'mt-field' }, [
@@ -1051,25 +1169,33 @@
               radioGroup('mt-curve-model', curve.model || 'exponential', [
                 { value: 'exponential', label: t('set.curveExp') },
                 { value: 'additive', label: t('set.curveAdd') },
+                { value: 'custom', label: t('set.curveCustom') },
               ], function (value) {
                 setDraftPath('curve.model', value)
+                updateCurveVisibility()
               }),
             ]),
             h('div', { class: 'mt-row' }, [
               numberField(t('set.base'), curve.baseTtlDays, function (value) {
                 setDraftPath('curve.baseTtlDays', value)
+                renderCurvePreview()
               }, { step: '0.5', min: '0' }),
               numberField(t('set.growth'), curve.growth, function (value) {
                 setDraftPath('curve.growth', value)
+                renderCurvePreview()
               }, { step: '0.1', min: '1' }),
               numberField(t('set.survivalFloor'), curve.survivalFloor, function (value) {
                 setDraftPath('curve.survivalFloor', value)
+                renderCurvePreview()
               }, { step: '0.01', min: '0.001', max: '0.9' }),
               maxDaysInput,
             ]),
             h('div', { style: { marginTop: '10px' } }, maxToggle),
             curveWarn,
+            curveCustomBox,
           ]))
+          curveCustomBox.hidden = (curve.model || 'exponential') !== 'custom'
+          renderCurvePreview()
 
           /* 归档 */
           const archiveCard = card(t('set.archive'), null, h('div', {}, [
@@ -1333,6 +1459,35 @@
 
           const customCard = card(t('set.custom'), null, h('div', {}, [customList, addForm]))
 
+          /* 独立记忆文件 */
+          const standalone = draft.standalone || {}
+          const standalonePathInput = h('input', {
+            class: 'mt-input',
+            type: 'text',
+            placeholder: t('set.standalonePathHint'),
+            value: standalone.path || '',
+            oninput: function (event) { setDraftPath('standalone.path', event.target.value) },
+          })
+          const standaloneDelimiterInput = h('input', {
+            class: 'mt-input',
+            type: 'text',
+            value: standalone.delimiter || 'blank',
+            oninput: function (event) { setDraftPath('standalone.delimiter', event.target.value) },
+          })
+          const standaloneCard = card(t('set.standalone'), t('set.standaloneHint'), h('div', { style: { display: 'grid', gap: '8px' } }, [
+            checkRow(t('set.standaloneEnabled'), standalone.enabled !== false, function (value) {
+              setDraftPath('standalone.enabled', value)
+            }),
+            field(t('set.standalonePath'), standalonePathInput, t('set.standalonePathHint')),
+            h('div', { class: 'mt-row' }, [
+              field(t('set.standaloneDelimiter'), standaloneDelimiterInput, t('set.standaloneDelimiterHint')),
+              field(t('set.mode'), selectEl([
+                { value: 'archive', label: t('set.modeArchive') },
+                { value: 'delete', label: t('set.modeDelete') },
+              ], standalone.mode || 'archive', function (value) { setDraftPath('standalone.mode', value) })),
+            ]),
+          ]))
+
           /* 发现 */
           const scanInfo = ui.scan
           const discoveryRows = h('div', { class: 'mt-rows' })
@@ -1381,7 +1536,7 @@
             h('pre', { class: 'mt-log', text: logLines.length ? logLines.join('\n') : t('set.logEmpty') }),
           ]))
 
-          replace(settingsPane, [head, switches, curveCard, archiveCard, mergeCard, sweepCard, statusCard, sourcesCard, customCard, discoveryCard, logCard])
+          replace(settingsPane, [head, switches, curveCard, archiveCard, mergeCard, sweepCard, statusCard, sourcesCard, standaloneCard, customCard, discoveryCard, logCard])
           settingsPane.hidden = ui.tab !== 'settings'
         }
 
@@ -1465,7 +1620,7 @@
           const draft = ui.draft || {}
           const patch = {}
           for (const key of ['enabled', 'dryRun']) if (draft[key] !== undefined) patch[key] = draft[key]
-          for (const key of ['curve', 'archive', 'sweep', 'mentions', 'adapters', 'discovery', 'board', 'merge']) {
+          for (const key of ['curve', 'archive', 'sweep', 'mentions', 'standalone', 'adapters', 'discovery', 'board', 'merge']) {
             if (draft[key] && typeof draft[key] === 'object') patch[key] = clone(draft[key])
           }
           if (Array.isArray(draft.customAdapters)) patch.customAdapters = clone(draft.customAdapters)
@@ -1498,9 +1653,11 @@
         async function pullState() {
           try {
             const data = await request('/state')
+            const hadDirty = isDraftDirty()
             ui.state = data || {}
             ui.settings = (data && data.settings) || {}
-            ui.draft = clone(ui.settings)
+            // 用户正在编辑时不要用刷新把 draft 冲掉。
+            if (!hadDirty || !ui.draft) ui.draft = clone(ui.settings)
             if (ui.tab === 'settings') renderSettings()
           } catch (error) {
             if (ui.tab === 'settings') renderSettings()

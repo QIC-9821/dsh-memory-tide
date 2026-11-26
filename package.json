@@ -1,8 +1,8 @@
 {
     "name":  "dsh-memory-tide",
-    "version":  "0.2.9",
+    "version":  "0.2.12",
     "type":  "module",
-    "description":  "Automatic forgetting curve for DSH memory plugins: exponential (Ebbinghaus) or additive TTL with spaced reset, hot/cold archive, duplicate merging, discovery for new stores, and a memory board.",
+    "description":  "Automatic forgetting curve for DSH memory: Ebbinghaus exponential, additive or custom-expression TTL with spaced reset, hot/cold archive, duplicate merging, a standalone memory file, discovery for new stores, and a memory board.",
     "license":  "MIT",
     "author":  "QIC-9821",
     "repository":  {

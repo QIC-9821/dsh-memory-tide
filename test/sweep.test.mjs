@@ -141,6 +141,11 @@ test('到期活跃条目：写 hot 归档并从 adapter 移除，state 转 archi
   assert.equal(hot.length, 1)
   assert.equal(hot[0].key, 'fish:a')
   assert.equal(hot[0].text, '陈旧的记忆条目')
+  assert.equal(hot[0].tombstone.cause, 'decay')
+  assert.equal(hot[0].tombstone.actor, 'sweep')
+  assert.equal(hot[0].tombstone.at, NOW)
+  assert.equal(hot[0].tombstone.idleDays, 30)
+  assert.ok(hot[0].tombstone.ttlDays > 0)
   assert.ok(logs.some((l) => l.includes('fish') && l.includes('archived=1')))
 })
 
@@ -227,10 +232,21 @@ test('pinned / 保护词 / 冷归档 都跳过', async () => {
   assert.equal(state.items['fish:c'].state, 'cold')
 })
 
-test('归档期满 onExpiry=cold：hot 转 cold，state 转 cold', async () => {
+test('归档期满 onExpiry=cold：hot 转 cold，墓碑跟着抄过去', async () => {
   await resetStore()
   const entry = fishEntry('a', '已经归档一阵子的条目')
-  await store.putArchive(entry, 'hot')
+  const tombstone = {
+    v: 1,
+    at: NOW - 60 * DAY,
+    actor: 'sweep',
+    cause: 'decay',
+    preview: '已经归档一阵子的条目',
+    lastActiveAt: NOW - 90 * DAY,
+    idleDays: 30,
+    touches: 1,
+    ttlDays: 21,
+  }
+  await store.putArchive({ ...entry, tombstone }, 'hot')
   const f = makeAdapter('fish', [entry])
   const state = store.emptyState()
   state.items['fish:a'] = fishItem('a', { state: 'archived', archivedAt: NOW - 60 * DAY, expiresAt: NOW - 1 })
@@ -246,6 +262,8 @@ test('归档期满 onExpiry=cold：hot 转 cold，state 转 cold', async () => {
   const cold = await store.listArchive('cold')
   assert.equal(cold.length, 1)
   assert.equal(cold[0].key, 'fish:a')
+  assert.equal(cold[0].tombstone.preview, '已经归档一阵子的条目')
+  assert.equal(cold[0].tombstone.cause, 'decay')
 })
 
 test('归档期满 onExpiry=delete：删 hot 归档、删 item、adapter 里还在就再删一次', async () => {

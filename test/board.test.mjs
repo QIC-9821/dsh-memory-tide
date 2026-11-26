@@ -294,6 +294,64 @@ test('act archive backs up, writes hot archive and removes the live entry', asyn
   assert.equal(store.calls.saves, 1)
 })
 
+test('act archive 写入墓碑，归档行带上原因与摘录', async () => {
+  const entry = makeEntry('fish', 'a', { text: '第一条正文。第二条不该出现在墓碑里', date: NOW })
+  const fish = makeAdapter('fish', [entry])
+  const store = makeStore()
+  const state = makeState({
+    'fish:a': {
+      adapterId: 'fish',
+      entryId: 'a',
+      firstSeenAt: NOW - 40 * DAY,
+      lastSeenAt: NOW - 40 * DAY,
+      lastRecalledAt: NOW - 9 * DAY,
+      resetAt: 0,
+      touches: 1,
+      pinned: false,
+      state: 'active',
+      archivedAt: 0,
+      expiresAt: 0,
+      date: NOW,
+    },
+  })
+  const registry = makeRegistry([fish])
+  const settings = makeSettings()
+
+  const result = await act({ registry, state, settings, op: 'archive', keys: ['fish:a'], store, now: NOW })
+  assert.deepEqual(result.results, [{ key: 'fish:a', ok: true }])
+
+  const hot = await store.readArchive('fish:a')
+  assert.equal(hot.tombstone.cause, 'manual')
+  assert.equal(hot.tombstone.actor, 'manual')
+  assert.equal(hot.tombstone.at, NOW)
+  assert.equal(hot.tombstone.idleDays, 9)
+  assert.equal(hot.tombstone.preview, '第一条正文')
+
+  const listed = await listEntries({ registry, state, settings, store })
+  const row = listed.rows.find((item) => item.key === 'fish:a')
+  assert.equal(row.source, 'archive')
+  assert.equal(row.tombstone.cause, 'manual')
+  assert.equal(row.tombstone.preview, '第一条正文')
+  assert.equal(row.tombstone.idleDays, 9)
+})
+
+test('旧归档没有墓碑时降级成 legacy，活跃行没有墓碑', async () => {
+  const { registry, state, settings, store } = setup()
+  const result = await listEntries({ registry, state, settings, store })
+
+  const archived = result.rows.find((row) => row.key === 'fish:d')
+  assert.equal(archived.source, 'archive')
+  assert.equal(archived.tombstone.cause, 'legacy')
+  assert.equal(archived.tombstone.preview, '已归档 D')
+
+  const cold = result.rows.find((row) => row.key === 'fish:e')
+  assert.equal(cold.tombstone.cause, 'legacy')
+
+  const live = result.rows.filter((row) => row.source === 'live')
+  assert.ok(live.length > 0)
+  for (const row of live) assert.equal(row.tombstone, null)
+})
+
 test('act delete hard-deletes live + archive and clears state', async () => {
   const path = 'C:\\libs\\fish.json'
   const entry = makeEntry('fish', 'a', { text: 'A', date: NOW, path })
@@ -448,6 +506,10 @@ test('listEntries surfaces source archives and act restores them', async () => {
   assert.equal(board.total, 1)
   assert.equal(board.rows[0].source, 'source-archive')
   assert.equal(board.rows[0].state, 'archived')
+  // 源插件自己收走的归档：不知道原因，但也要给出「讲的是哪句」。
+  assert.equal(board.rows[0].tombstone.cause, 'source')
+  assert.equal(board.rows[0].tombstone.preview, '源归档的一条')
+  assert.equal(board.rows[0].tombstone.at, Date.UTC(2026, 10, 20))
 
   const archivedOnly = await listEntries({
     registry: makeRegistry([evolve]),

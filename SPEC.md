@@ -91,7 +91,9 @@ dsh-memory-tide/
 {
   enabled: true,
   dryRun: false,
-  curve: { baseTtlDays: 7, growth: 2.0, maxTtlEnabled: true, maxTtlDays: 90 },
+  curve: { model: "exponential", baseTtlDays: 7, growth: 2.0, survivalFloor: 0.1,
+           maxTtlEnabled: true, maxTtlDays: 90, customExpr: "base * (1 + growth * touches)" },
+  // model: exponential（默认，艾宾浩斯遗忘曲线/指数衰减）| additive（常数叠加）| custom（自定义函数表达式）
   mentions: { enabled: true, minSharedGrams: 2, protectKeywords: "勿删,待确认,勿动,不要归档,不要删除" },
   archive: { archiveDays: 30, onExpiry: "cold" },   // cold = 归档期满转冷归档（仅手动恢复）；delete = 期满硬删
   sweep: { intervalMinutes: 30, onTurnEnd: true, startupDelaySec: 10 },
@@ -101,6 +103,8 @@ dsh-memory-tide/
               tracks: { memory: true, key: true, user: false, project: false, daily: false } }
   },
   customAdapters: [],            // 通用文件映射，见 §7
+  standalone: { enabled: true, path: "", format: "md", delimiter: "blank", mode: "archive" },
+  // 独立记忆文件：path 留空 = DSH_HOME/memories/memory-tide/MEMORY.md；不依赖任何记忆插件
   discovery: { enabled: true, autoAdoptHighConfidence: false, deny: [] },
   board: { pageSize: 100 }
 }
@@ -138,6 +142,11 @@ export function emptyState() -> {version:1, items:{}, deny:[], lastSweepAt:0, fi
 //                archivedAt, expiresAt, date, textHash }
 export async function backupFile(path) -> backupPath|null  // 文件不存在返回 null；同名去重（同一天只备份一次）
 export async function putArchive(entry, tier /* "hot"|"cold" */)  // 写入完整 Entry JSON
+// Entry JSON 可带 tombstone（墓碑）：{ v:1, at, actor:"sweep"|"manual",
+//   cause:"decay"|"manual"|"legacy", preview, lastActiveAt, idleDays, touches, ttlDays }
+// 只有归档时写；适配器恢复时不认识这个字段，不会写回用户的记忆文件。
+// 源插件自己的归档（evolve 的 *-archive.md 等）不落盘墓碑，面板按需合成：
+//   { v:0, at: entry.date, actor:"source", cause:"source", preview }
 export async function readArchive(key) -> entry|null
 export async function listArchive(tier) -> entry[]
 export async function removeArchive(key)
@@ -150,7 +159,9 @@ export async function readLog(lines = 50) -> string[]
 
 `curve.mjs`
 ```js
-export function ttlDays(touches, curve)      // model='exponential'（默认）: base*(t*log2(growth)+log2(1/floor))；model='additive': base*growth^t；maxTtlEnabled 时 min(..., maxTtlDays)
+export function ttlDays(touches, curve)      // model='exponential'（默认）: base*(t*log2(growth)+log2(1/floor))；model='additive': base*growth^t；model='custom': 执行 curve.customExpr（变量 touches/base/growth/floor，另可用数学短名 log/ln/exp/sqrt/pow/abs/min/max/log10/log2/ceil/round 与常量 e/PI），失败回退 exponential；maxTtlEnabled 时 min(..., maxTtlDays)
+export function compileCustomExpr(expr)      // 编译并缓存表达式，返回 (touches, base, growth, floor) => days；空/语法错/非正数抛错
+export function isValidCustomExpr(expr)      // 用 t=0/1/5 验证表达式能算出正数
 export function lastActivity(item)           // max(resetAt, lastRecalledAt, firstSeenAt)
 export function isExpired(item, curve, now)  // now >= lastActivity + ttlDays*86400000
 export function nextExpiry(item, curve)      // 毫秒时间戳，展示用
@@ -187,8 +198,8 @@ adapter 对象：
 
 `registry.mjs`
 ```js
-export function createRegistry({ settings, logger }) -> {
-  adapters() -> adapter[],           // 内置 + settings.customAdapters 实例化
+export function createRegistry({ settings, getSettings?, logger, loadAdapterModule? }) -> {
+  adapters() -> adapter[],           // 内置 + standalone + settings.customAdapters 实例化 + 第三方来源
   get(id) -> adapter | undefined,
   async reload(),                    // 设置变了以后重建
   registerSource(src),               // 第三方自注册；src 需实现 id/label/list/remove
@@ -216,6 +227,13 @@ export function createRegistry({ settings, logger }) -> {
 - 锁：用 `~/.dsh/memories/.memory.lock`，`withLock` 语义（O_EXCL 创建，5s 超时，stale 10s 强制接管）。
 - 写：`backupFile` → tmp+rename。`add(entry)`：在文件末尾追加 `\n§\n` + 原文（若 `raw` 存在用 raw，否则用 `[dateText] ` + text）。
 - `list()` 返回五轨里启用的所有条目，`track` 字段标明。
+
+### 7.0 独立记忆文件（standalone）
+不装任何记忆插件时，潮汐自己也能当记忆库：
+- `settings.standalone = { enabled, path, format: "md", delimiter: "blank", mode: "archive" }`。
+- `path` 留空 → `DSH_HOME/memories/memory-tide/MEMORY.md`（DSH_HOME 未设则 `~/.dsh`）。
+- reload 时若 `enabled !== false`，在 customAdapters 之前插入 `{ id: "standalone", type: "file-md", label: "独立记忆文件", path, mode, format: { delimiter } }`，随后走 file-md 适配器。
+- 路径/分隔符可改；`mode` 为 `delete` 时归档期满直接删，为 `archive`（默认）时进热归档。sweep 按 `settings.standalone.mode` 决定，不读 `adapters` 段。
 
 ### 7.3 通用 file-md
 settings.customAdapters 项：
@@ -309,7 +327,8 @@ export function apply(ctx, config) { ... }
 export async function listEntries({ registry, state, settings, query = {} })
 // query: { state: "active"|"archived"|"cold"|"all", adapter, q, page=1, pageSize }
 // 返回 { total, page, pageSize, rows: [{ key, adapterId, adapterLabel, entryId, date, dateText,
-//          text, tags, track, state, pinned, expiresAt, touches, source: "live"|"archive" }] }
+//          text, tags, track, state, pinned, expiresAt, touches, source: "live"|"archive",
+//          tombstone: { cause: "decay"|"manual"|"legacy", preview, at, idleDays, ttlDays, ... } | null }] }
 export async function act({ registry, state, settings, op, keys })
 // op: "archive" | "delete" | "restore" | "pin" | "unpin"
 // 返回 { results: [{ key, ok, error }] }
@@ -354,12 +373,12 @@ IIFE，`window.__ModuleLoader__.load({ id:'dsh-memory-tide', factory(require){ .
 
 两个页签：
 1. **记忆**（默认，仿 memory-evolve 的 pretty 卡片）
-   - 工具条：搜索框、状态筛选 chips（全部/活跃/已归档/冷归档/已置顶）、来源下拉、刷新、「扫描新记忆库」。
-   - 分组：今天 / 昨天 / 本周 / 更早 / 日期未知；卡片 = 勾选框 + 日期徽章 + 来源徽章 + 到期倒计时（x 天后 / 已到期 / 无上限 / 冷归档）+ 正文（2 行截断，点击展开）+ 标签 + 单条按钮（置顶/归档/删除/恢复）。
+   - 工具条：搜索框、状态筛选 chips（全部/活跃/热归档/冷归档/已置顶）、来源下拉、刷新、「扫描新记忆库」。
+   - 分组：今天 / 昨天 / 本周 / 更早 / 日期未知；卡片 = 勾选框 + 日期徽章 + 来源徽章 + 到期倒计时（x 天后 / 已到期 / 无上限 / 冷归档）+ 正文（2 行截断，点击展开）+ 墓碑一行（归档条目：为什么被收走 + 讲的是哪句）+ 标签 + 单条按钮（置顶/归档/删除/恢复）。
    - 底部浮条：已选 N 条 → 归档 / 删除 / 置顶 / 取消；删除弹确认（写明条数与来源）。
    - 分页 100/页，滚到底「加载更多」；空态、加载中、错误 toast。
 2. **设置**
-   - 总开关 / 演练开关 / 曲线（3 个数字 + 上限开关；关闭时提示 growth^n 可能很大）/ 归档（archiveDays + onExpiry 单选：冷归档仅手动恢复 / 直接删除）/ 清扫间隔 / 首次演练状态。
+   - 总开关 / 演练开关 / 曲线（模型三选一：艾宾浩斯遗忘曲线（指数衰减）/常数叠加/自定义函数；自定义时显示表达式输入、可用数学短名（log/ln/exp/sqrt/pow/abs/min/max/log10/log2/ceil/round、常量 e/PI）提示与 0/1/3/10 次提及的天数预览；3 个数字 + 上限开关；关闭上限时提示 growth^n 可能很大）/ 归档（archiveDays + onExpiry 单选：冷归档仅手动恢复 / 直接删除）/ 独立记忆文件（开关、路径、分隔符、清理方式）/ 清扫间隔 / 首次演练状态。
    - 适配器卡片：fish、evolve（五个轨的勾选；project/daily 勾选时显示红色警告：「这两轨是每回合写入的日志，增长快，清理后调试线索会丢」）、自定义适配器列表（新增/删除/测试）。
    - 发现：扫描结果表，每行 启用 / 忽略。
    - 日志：最近 50 行 `<pre>`。

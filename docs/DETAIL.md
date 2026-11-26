@@ -15,7 +15,8 @@
 |---|---|
 | `lib/settings.mjs` | 默认值、白名单清洗、原子写、`DSH_MEMORY_TIDE_HOME` 隔离 |
 | `lib/store.mjs` | state.json、hot/cold 归档、改动前备份 |
-| `lib/curve.mjs` | 两种曲线：指数衰减（默认，`S = 2^(-t/base)`，提及 ×growth，低于 survivalFloor 到期，`ttl = base × (touches·log2(growth) + log2(1/floor))`）与常数叠加（`ttl = base × growth^touches`）；上限可关 |
+| `lib/curve.mjs` | 三种曲线：艾宾浩斯遗忘曲线（指数衰减，默认，`S = 2^(-t/base)`，提及 ×growth，低于 survivalFloor 到期，`ttl = base × (touches·log2(growth) + log2(1/floor))`）、常数叠加（`ttl = base × growth^touches`）与自定义表达式（`curve.customExpr`，返回天数，可用 `log/ln/exp/sqrt/pow/abs/min/max/log10/log2/ceil/round` 与 `e/PI`，编译或求值失败回退指数衰减）；上限可关 |
+| `lib/tombstone.mjs` | 归档墓碑：本地算「为什么被收走 + 首句摘录」，跟着归档 JSON 一起落盘 |
 | `lib/match.mjs` | 提到检测：字符 n-gram、共享 gram 阈值、保护词 |
 | `lib/sweep.mjs` | 一轮清扫：重复整合（可选）→ 到期判断、归档、冷却、删除、失败回滚 |
 | `lib/merge.mjs` | 近似重复聚类（Dice 2-gram）、保留/改写方案、写盘与回退 |
@@ -44,6 +45,7 @@
 - **fish**：读 `~/.dsh/fish-memory/*.json`，写前比对 mtime；不写 `deleted[]` 墓碑；恢复时复用原 `entryId`。
 - **evolve**：按真实布局 `MEMORY.md` / `USER.md` / `projects/<hash>/KEY.md` / `projects/<hash>/MEMORY.md` / `daily/YYYY-MM-DD.md`；写前用它的 `.memory.lock`，drift guard 失败就拒绝覆盖；自动清扫忽略 `*-archive.md`、`*.bak*`、`TODOS.md`；`listArchived` 单独读 `*-archive.md`（同文去重、含已关闭轨），`unarchive` 把条目搬回活文件。
 - **file-md / file-json**：设置页配置路径、分隔符、日期正则、列表路径；只整段删，保留其余字节和换行风格。
+- **standalone（独立记忆文件）**：不是内置适配器，reload 时按 `settings.standalone` 生成一个 `file-md` 实例，id 固定为 `standalone`，在没有任何记忆插件时也能单独清扫一个 Markdown 文件；路径留空即 `DSH_HOME/memories/memory-tide/MEMORY.md`，清理方式（archive / delete）由 `settings.standalone.mode` 决定。
 
 ## 安全不变量
 
@@ -52,6 +54,8 @@
 - 文件被外部改过（mtime / drift guard 不符）→ 跳过本次，不猜、不合并。
 - 置顶（pinned）与保护词命中的条目不参与自动删除。
 - 删除失败时回滚刚写的 hot 归档，保证「要么删掉、要么原样」。
+- 归档时在条目上写 `tombstone`（原因 + 首句摘录），面板据此显示一行说明；适配器恢复时不认识这个字段，所以不会把墓碑写回用户的记忆文件。
+- 源插件自己的归档（`source: "source-archive"`）没有墓碑文件，面板现算一条 `cause: "source"` 的摘录行，只说明「讲的是哪句」，不编造原因。
 
 ## 测试
 
@@ -59,4 +63,4 @@
 node --test test/*.test.mjs
 ```
 
-107 个用例，覆盖曲线、匹配、清扫、四个适配器（含源归档列出与恢复）、发现、面板与路由。适配器测试都在 `mkdtemp` 里造数据，不碰真实记忆；`DSH_FISH_STORE_SAMPLE` 指向真实 fish 库时会额外跑一条只读冒烟。
+118 个用例，覆盖曲线（含自定义表达式与 standalone mode）、匹配、清扫、四个适配器（含源归档列出与恢复）、独立记忆文件、发现、面板与路由。适配器测试都在 `mkdtemp` 里造数据，不碰真实记忆；`DSH_FISH_STORE_SAMPLE` 指向真实 fish 库时会额外跑一条只读冒烟。

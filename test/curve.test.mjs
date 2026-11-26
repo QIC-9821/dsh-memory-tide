@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ttlDays, lastActivity, isExpired, nextExpiry } from '../lib/curve.mjs'
+import { ttlDays, lastActivity, isExpired, nextExpiry, isValidCustomExpr } from '../lib/curve.mjs'
 
 const DAY = 86400000
 const additive = { model: 'additive', baseTtlDays: 7, growth: 2, maxTtlEnabled: true, maxTtlDays: 90 }
@@ -75,6 +75,92 @@ test('ttlDays: 非法 touches 视为 0', () => {
   assert.equal(ttlDays(undefined, additive), 7)
   assert.equal(ttlDays('2', additive), 7)
   assert.equal(ttlDays(NaN, additive), 7)
+})
+
+test('custom: 表达式按 touches 计算天数', () => {
+  const c = {
+    model: 'custom',
+    customExpr: 'base * (1 + growth * touches)',
+    baseTtlDays: 7,
+    growth: 2,
+    maxTtlEnabled: false,
+  }
+  assert.equal(ttlDays(0, c), 7)
+  assert.equal(ttlDays(1, c), 21)
+  assert.equal(ttlDays(3, c), 49)
+})
+
+test('custom: 表达式可用 floor 变量', () => {
+  const c = {
+    model: 'custom',
+    customExpr: 'base * Math.log2(1 / floor)',
+    baseTtlDays: 7,
+    growth: 2,
+    maxTtlEnabled: false,
+  }
+  close(ttlDays(0, c), 7 * Math.log2(10))
+})
+
+test('custom: 表达式非法或算不出非负有限数时回退艾宾浩斯', () => {
+  const base = { model: 'custom', baseTtlDays: 7, growth: 2, maxTtlEnabled: false }
+  // 语法错误
+  close(ttlDays(1, { ...base, customExpr: 'base * (' }), 7 * (Math.log2(10) + 1))
+  // 返回负数
+  close(ttlDays(1, { ...base, customExpr: '-5' }), 7 * (Math.log2(10) + 1))
+  // 返回 NaN
+  close(ttlDays(1, { ...base, customExpr: '0/0' }), 7 * (Math.log2(10) + 1))
+})
+
+test('custom: 同样受 maxTtlEnabled 封顶', () => {
+  const c = {
+    model: 'custom',
+    customExpr: '1000',
+    baseTtlDays: 7,
+    growth: 2,
+    maxTtlEnabled: true,
+    maxTtlDays: 90,
+  }
+  assert.equal(ttlDays(0, c), 90)
+})
+
+test('isValidCustomExpr 只接受能算出非负有限数的表达式', () => {
+  assert.equal(isValidCustomExpr('base * (1 + growth * touches)'), true)
+  assert.equal(isValidCustomExpr('touches + 1'), true)
+  assert.equal(isValidCustomExpr(''), false)
+  assert.equal(isValidCustomExpr('   '), false)
+  assert.equal(isValidCustomExpr('base * ('), false)
+  assert.equal(isValidCustomExpr('-1'), false)
+  assert.equal(isValidCustomExpr('0/0'), false)
+})
+
+test('custom: 表达式里能直接用数学短名和常量', () => {
+  const c = (expr) => ({
+    model: 'custom',
+    customExpr: expr,
+    baseTtlDays: 7,
+    growth: 2,
+    survivalFloor: 0.1,
+    maxTtlEnabled: false,
+  })
+  close(ttlDays(2, c('log(touches + 1) * base')), 7 * Math.log(3))
+  close(ttlDays(2, c('ln(touches + 1) * base')), 7 * Math.log(3))
+  close(ttlDays(1, c('exp(touches)')), Math.E)
+  close(ttlDays(2, c('sqrt(touches) * base')), 7 * Math.sqrt(2))
+  close(ttlDays(2, c('pow(touches + 1, 2)')), 9)
+  close(ttlDays(0, c('abs(touches) + 1')), 1)
+  close(ttlDays(2, c('max(touches, 5)')), 5)
+  close(ttlDays(2, c('min(touches, 1) + base')), 8)
+  close(ttlDays(2, c('log10(1000) + base')), 10)
+  close(ttlDays(2, c('log2(8) + touches')), 5)
+  close(ttlDays(2, c('ceil(1.2) + touches')), 4)
+  close(ttlDays(2, c('round(1.6) + touches')), 4)
+  close(ttlDays(1, c('e')), Math.E)
+  close(ttlDays(1, c('PI / 2')), Math.PI / 2)
+  close(ttlDays(1, c('pi * 2')), Math.PI * 2)
+  // floor 是注入变量（生存阈值），不能被同名函数遮住
+  close(ttlDays(1, c('floor * 100')), 10)
+  assert.equal(isValidCustomExpr('base * log(touches + 1)'), true)
+  assert.equal(isValidCustomExpr('ceil(touches / 3) + 1'), true)
 })
 
 test('lastActivity 取三者最大', () => {
